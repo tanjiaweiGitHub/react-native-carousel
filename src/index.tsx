@@ -60,7 +60,7 @@ export const Carousel: React.FC<Props> = ({
   onBeforeSnapToItem,
   onAfterSnapToItem,
 }: Props) => {
-  const loopClonesPerSide = useLoopClonesPerSide(propsData, propsLoopClonesPerSide);
+  const loopClonesPerSide = useLoopClonesPerSide(propsData, loop, propsLoopClonesPerSide);
   const data = useData(propsData, loop, loopClonesPerSide);
   const initIndex = useInitIndex(initRealIndex, data, loopClonesPerSide);
   const size = useSize(horizontal, itemWidth, itemHeight);
@@ -228,26 +228,27 @@ const useInitIndex = (initRealIndex, data, loopClonesPerSide) => {
   const [initIndex, setInitIndex] = useState(0);
   useEffect(() => {
     const len = data.length;
-    if(len !== 0){
-      const _index = initRealIndex % len;
-      const _initRealIndex = initRealIndex < 0 ? (len + _index) : _index;
+    const realLength = len - loopClonesPerSide * 2
+    if (realLength !== 0) {
+      const _index = initRealIndex  % realLength;
+      const _initRealIndex = initRealIndex < 0 ? (realLength + _index) : _index;
       const _initIndex = _initRealIndex + loopClonesPerSide
       setInitIndex(_initIndex);
     }
-  }, [data.length]);
+  }, [data.length, loopClonesPerSide]);
   return initIndex;
 };
 
-const useLoopClonesPerSide = (data, propsLoopClonesPerSide: number ) => {
-  const [loopClonesPerSide, setLoopClonesPerSide] = useState(propsLoopClonesPerSide)
+const useLoopClonesPerSide = (data, loop: boolean, propsLoopClonesPerSide: number ) => {
+  const [loopClonesPerSide, setLoopClonesPerSide] = useState( 0)
   useEffect(() => {
     const len = data.length;
-    if( len < propsLoopClonesPerSide) {
-      setLoopClonesPerSide(len)
+    if (loop) {
+      setLoopClonesPerSide( len < propsLoopClonesPerSide ? propsLoopClonesPerSide : len )
     } else {
-      setLoopClonesPerSide(propsLoopClonesPerSide)
+      setLoopClonesPerSide(0)
     }
-  },[data.length, propsLoopClonesPerSide])
+  },[data.length, propsLoopClonesPerSide, loop])
 return loopClonesPerSide;
 }
 
