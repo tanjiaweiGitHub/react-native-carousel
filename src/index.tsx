@@ -28,7 +28,7 @@ interface Props {
   swipeThreshold?: number, // 滑动阈值, 不超过此值， 恢复到原来
   horizontal?: boolean, // 等于true, 水平布局
   loop?: boolean // 等于true, 开启无限循环模式
-  loopClonesPerSide?: number,
+  loopClonesPerSide?: number, // 无限循环时， 在两端添加的数量, 必须小于数据的长度
   autoplayReverse?: boolean, // 默认false, 向左/上， 为true时反向
   autoplay?: boolean // 等于true, 开启自动播放
   autoplayDuration?: number //  单位毫秒， 滚动一项需要的时间
@@ -51,7 +51,7 @@ export const Carousel: React.FC<Props> = ({
   swipeThreshold = DEFAULT_SWIPE_THRESHOLD,
   horizontal = true,
   loop = true,
-  loopClonesPerSide = DEFAULT_LOOP_CLONES_PER_SIDE,
+  loopClonesPerSide: propsLoopClonesPerSide = DEFAULT_LOOP_CLONES_PER_SIDE,
   autoplay = false,
   autoplayDuration = 500,
   autoplayReverse = false,
@@ -60,8 +60,9 @@ export const Carousel: React.FC<Props> = ({
   onBeforeSnapToItem,
   onAfterSnapToItem,
 }: Props) => {
+  const loopClonesPerSide = useLoopClonesPerSide(propsData, propsLoopClonesPerSide);
   const data = useData(propsData, loop, loopClonesPerSide);
-  const initIndex = useInitIndex(initRealIndex, data);
+  const initIndex = useInitIndex(initRealIndex, data, loopClonesPerSide);
   const size = useSize(horizontal, itemWidth, itemHeight);
   const containerSpace = useContainerSpace(size, horizontal ? sliderWidth : sliderHeight);
   const listOffset = useListOffset(initIndex, size, containerSpace,);
@@ -175,7 +176,7 @@ export const Carousel: React.FC<Props> = ({
         width: sliderWidth,
         height: sliderHeight,
         overflow: 'hidden',
-      }]}
+      }, horizontal ? {justifyContent: 'center'}: {alignItems: 'center',}]}
       >
         <Animated.View style={[{
           transform: [horizontal ? { translateX: distanceAnimated } : { translateY: distanceAnimated }],
@@ -223,18 +224,32 @@ const useContainerSpace = (size, containerSize) => {
   return containerSpace;
 };
 
-const useInitIndex = (initRealIndex, data) => {
+const useInitIndex = (initRealIndex, data, loopClonesPerSide) => {
   const [initIndex, setInitIndex] = useState(0);
   useEffect(() => {
     const len = data.length;
-    const _index = initRealIndex % len;
-    const _initRealIndex = initRealIndex < 0 ? (len + _index) : _index;
-
-    const _initIndex = data.findIndex((item) => item.realIndex === _initRealIndex);
-    setInitIndex(_initIndex);
+    if(len !== 0){
+      const _index = initRealIndex % len;
+      const _initRealIndex = initRealIndex < 0 ? (len + _index) : _index;
+      const _initIndex = _initRealIndex + loopClonesPerSide
+      setInitIndex(_initIndex);
+    }
   }, [data.length]);
   return initIndex;
 };
+
+const useLoopClonesPerSide = (data, propsLoopClonesPerSide: number ) => {
+  const [loopClonesPerSide, setLoopClonesPerSide] = useState(propsLoopClonesPerSide)
+  useEffect(() => {
+    const len = data.length;
+    if( len < propsLoopClonesPerSide) {
+      setLoopClonesPerSide(len)
+    } else {
+      setLoopClonesPerSide(propsLoopClonesPerSide)
+    }
+  },[data.length, propsLoopClonesPerSide])
+return loopClonesPerSide;
+}
 
 const useData = (arr: Array<any> = [], loop: boolean = true, loopClonesPerSide: number): Array<{
   readonly realIndex: number,
@@ -248,7 +263,7 @@ const useData = (arr: Array<any> = [], loop: boolean = true, loopClonesPerSide: 
         realIndex: index,
         item,
       }));
-      if (loop) {
+      if (loop && loopClonesPerSide > 0) {
         const beforeArr = _data.slice(0, loopClonesPerSide);
         const afterArr = _data.slice(-loopClonesPerSide);
         return [...afterArr, ..._data, ...beforeArr];
