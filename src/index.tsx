@@ -70,8 +70,9 @@ export const Carousel: React.FC<Props> = ({
   const positions = usePositions(data, size, containerSpace);
   const distanceAnimated = useDistanceAnimated(listOffset, data);
   const _lastOffset = useRef(0);
-  const timer = useRef(null);
+  const timer = useRef<number | null>(null);
   const activeIndex = useRef(initIndex);
+  const animatedEvent = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     _lastOffset.current = 0;
@@ -90,7 +91,7 @@ export const Carousel: React.FC<Props> = ({
     };
   }, [positions, autoplay]);
 
-  const onceAnimated = (nextIndex: number) => {
+  const onceAnimated = (nextIndex: number, duration?: number) => {
     const realNextIndex = positions[nextIndex] ? nextIndex : activeIndex.current;
     const nextItem = data[realNextIndex];
     let toValue = -positions[realNextIndex]?.start;
@@ -98,11 +99,12 @@ export const Carousel: React.FC<Props> = ({
       onBeforeSnapToItem({ item: nextItem.item, index: nextItem.realIndex });
     }
     distanceAnimated.flattenOffset();
-    Animated.timing(distanceAnimated, {
+    animatedEvent.current = Animated.timing(distanceAnimated, {
       toValue,
-      duration: autoplayDuration,
+      duration: duration || autoplayDuration,
       useNativeDriver
-    }).start(() => {
+    })
+    animatedEvent.current.start(() => {
       if (onAfterSnapToItem) {
         onAfterSnapToItem({ item: nextItem.item, index: nextItem.realIndex });
       }
@@ -131,7 +133,13 @@ export const Carousel: React.FC<Props> = ({
     }
   };
   const stopLoopAnimated = () => {
-    clearTimeout(timer.current);
+    // if( animatedEvent.current ) {
+    //   animatedEvent.current.stop();
+    // }
+    if ( timer.current ) {
+      clearTimeout(timer.current);
+    }
+
   };
 
   const onGestureEvent = useMemo(
@@ -153,11 +161,13 @@ export const Carousel: React.FC<Props> = ({
     }
     if (oldState === State.ACTIVE) {
       const translation = horizontal ? translationX : translationY;
+      if (translation === 0) { return null }
       _lastOffset.current += translation;
-      const _translation = scrollStepper === 'nearest' ? (translation % size) : translation;
+      const _translation = Math.abs(scrollStepper === 'nearest' ? (translation % size) : translation);
       const moveCount = scrollStepper === 'nearest' ? (Math.floor(translation / size) + (translation > 0 ? 0 : 1)) : 0;
-      const nextIndex = activeIndex.current - moveCount + ((swipeThreshold < Math.abs(_translation)) ? (translation > 0 ? -1 : 1) : 0);
-      onceAnimated(nextIndex);
+      const nextIndex = activeIndex.current - moveCount + ((swipeThreshold < _translation) ? (translation > 0 ? -1 : 1) : 0);
+      const duration = Math.floor(((swipeThreshold < _translation) ? (size - _translation) : _translation) / size * autoplayDuration);
+      onceAnimated(nextIndex, duration);
     }
   };
   if (data.length !== inputRanges.length) {
@@ -171,12 +181,13 @@ export const Carousel: React.FC<Props> = ({
       enabled={scrollEnabled}
       shouldCancelWhenOutside
       hitSlop={HIT_SLOP}
+      minDist={0}
     >
       <Animated.View style={[{
         width: sliderWidth,
         height: sliderHeight,
         overflow: 'hidden',
-      }, horizontal ? {justifyContent: 'center'}: {alignItems: 'center',}]}
+      }, horizontal ? {justifyContent: 'center'} : {alignItems: 'center',}]}
       >
         <Animated.View style={[{
           transform: [horizontal ? { translateX: distanceAnimated } : { translateY: distanceAnimated }],
@@ -190,17 +201,13 @@ export const Carousel: React.FC<Props> = ({
             });
             return (
               <Animated.View
-                style={{
-                  width: itemWidth,
-                  height: itemHeight,
-                }}
-                key={`carousel-${index}`}
+                style={{ width: itemWidth, height: itemHeight }}
+                key={`carousel-${item.carouselId}`}
               >
                 { renderItem({ item: item.item, index: item.realIndex }, animatedValue) }
               </Animated.View>
             );
           }) }
-
         </Animated.View>
       </Animated.View>
     </PanGestureHandler>
@@ -240,11 +247,11 @@ const useInitIndex = (initRealIndex, data, loopClonesPerSide) => {
 };
 
 const useLoopClonesPerSide = (data, loop: boolean, propsLoopClonesPerSide: number ) => {
-  const [loopClonesPerSide, setLoopClonesPerSide] = useState( 0)
+  const [loopClonesPerSide, setLoopClonesPerSide] = useState(0)
   useEffect(() => {
     const len = data.length;
     if (loop) {
-      setLoopClonesPerSide( len < propsLoopClonesPerSide ? propsLoopClonesPerSide : len )
+      setLoopClonesPerSide( len > propsLoopClonesPerSide ? propsLoopClonesPerSide : len )
     } else {
       setLoopClonesPerSide(0)
     }
@@ -254,6 +261,7 @@ return loopClonesPerSide;
 
 const useData = (arr: Array<any> = [], loop: boolean = true, loopClonesPerSide: number): Array<{
   readonly realIndex: number,
+  readonly carouselId: string,
   item: unknown
 }> => {
   const [data, setData] = useState([]);
@@ -271,7 +279,13 @@ const useData = (arr: Array<any> = [], loop: boolean = true, loopClonesPerSide: 
       }
       return [..._data];
     }
-    setData(_getData(arr));
+    setData(_getData(arr).map((item, index) => {
+      return {
+        item: item.item,
+        realIndex: item.realIndex,
+        carouselId: `carousel-${index}`
+      }
+    }));
   }, [arr, loop, loopClonesPerSide]);
   return data;
 };
@@ -320,6 +334,5 @@ const useInputRanges = (data, size, space) => {
     ]);
     setInputRanges(_interpolator);
   }, [data.length, size, space]);
-
   return inputRanges;
 };
