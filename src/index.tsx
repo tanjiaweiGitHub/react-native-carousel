@@ -253,7 +253,7 @@ const useInitIndex = (initRealIndex, data, loopClonesPerSide) => {
 const useScrollEnabled = (scrollEnabled: boolean): [boolean, (scrollEnabled: boolean)=> void ] => {
   const [enabled, setEnabled] = useState(scrollEnabled);
   useEffect(() => {
-    setEnabled(enabled)
+    setEnabled(scrollEnabled)
   }, [scrollEnabled])
   return [enabled, setEnabled]
 }
@@ -338,7 +338,7 @@ const useSize = (horizontal, width, height) => {
 const useInputRanges = (data, size, space) => {
   const [inputRanges, setInputRanges] = useState([]);
   useEffect(() => {
-    const _interpolator = data.map((item, index) => [
+    const _interpolator = data.map((item, index: number) => [
       (index - 1) * size - space,
       (index) * size - space,
       (index + 1) * size - space,
