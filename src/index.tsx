@@ -2,6 +2,9 @@ import React, {  useEffect, useState, useRef, useMemo } from 'react';
 import { Animated, Dimensions } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 
+// TODO
+// 1. scrollingDisable 为false时, 正在滚动中识别手势会导致跳动
+// 2. scrollStepper === nearest, 手势滚动多个item可能会卡在两端不能继续自动滚动
 
 const DEFAULT_SLIDER_WIDTH = Dimensions.get('window').width;
 const DEFAULT_ITEM_WIDTH = DEFAULT_SLIDER_WIDTH / 4;
@@ -24,6 +27,7 @@ interface Props {
   itemHeight?: number,
   sliderHeight?: number,
   scrollEnabled?: boolean, // 等于true, 允许手势滑动
+  scrollingDisable?: boolean, // 等于true时， 滚动时手势不生效，滚动结束手势生效
   scrollStepper?: 'next' | 'nearest', // next: 下一个, nearest: 手势结束后最近的
   swipeThreshold?: number, // 滑动阈值, 不超过此值， 恢复到原来
   horizontal?: boolean, // 等于true, 水平布局
@@ -46,7 +50,8 @@ export const Carousel: React.FC<Props> = ({
   sliderWidth = DEFAULT_SLIDER_WIDTH,
   itemHeight = DEFAULT_ITEM_WIDTH,
   sliderHeight = DEFAULT_SLIDER_WIDTH,
-  scrollEnabled = true,
+  scrollEnabled: propsScrollEnabled = true,
+  scrollingDisable = true,
   scrollStepper = 'nearest',
   swipeThreshold = DEFAULT_SWIPE_THRESHOLD,
   horizontal = true,
@@ -60,6 +65,7 @@ export const Carousel: React.FC<Props> = ({
   onBeforeSnapToItem,
   onAfterSnapToItem,
 }: Props) => {
+  const [scrollEnabled, setScrollEnabled] = useScrollEnabled(propsScrollEnabled)
   const loopClonesPerSide = useLoopClonesPerSide(propsData, loop, propsLoopClonesPerSide);
   const data = useData(propsData, loop, loopClonesPerSide);
   const initIndex = useInitIndex(initRealIndex, data, loopClonesPerSide);
@@ -72,7 +78,6 @@ export const Carousel: React.FC<Props> = ({
   const _lastOffset = useRef(0);
   const timer = useRef<number | null>(null);
   const activeIndex = useRef(initIndex);
-  const animatedEvent = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     _lastOffset.current = 0;
@@ -99,12 +104,17 @@ export const Carousel: React.FC<Props> = ({
       onBeforeSnapToItem({ item: nextItem.item, index: nextItem.realIndex });
     }
     distanceAnimated.flattenOffset();
-    animatedEvent.current = Animated.timing(distanceAnimated, {
+    if (scrollingDisable && propsScrollEnabled) {
+      setScrollEnabled(false)
+    }
+    Animated.timing(distanceAnimated, {
       toValue,
       duration: duration || autoplayDuration,
       useNativeDriver
-    })
-    animatedEvent.current.start(() => {
+    }).start(() => {
+      if (scrollingDisable && propsScrollEnabled) {
+        setScrollEnabled(true)
+      }
       if (onAfterSnapToItem) {
         onAfterSnapToItem({ item: nextItem.item, index: nextItem.realIndex });
       }
@@ -133,13 +143,9 @@ export const Carousel: React.FC<Props> = ({
     }
   };
   const stopLoopAnimated = () => {
-    // if( animatedEvent.current ) {
-    //   animatedEvent.current.stop();
-    // }
     if ( timer.current ) {
       clearTimeout(timer.current);
     }
-
   };
 
   const onGestureEvent = useMemo(
@@ -245,7 +251,13 @@ const useInitIndex = (initRealIndex, data, loopClonesPerSide) => {
   }, [data.length, loopClonesPerSide]);
   return initIndex;
 };
-
+const useScrollEnabled = (scrollEnabled: boolean): [boolean, (scrollEnabled: boolean)=> void ] => {
+  const [enabled, setEnabled] = useState(scrollEnabled);
+  useEffect(() => {
+    setEnabled(enabled)
+  }, [scrollEnabled])
+  return [enabled, setEnabled]
+}
 const useLoopClonesPerSide = (data, loop: boolean, propsLoopClonesPerSide: number ) => {
   const [loopClonesPerSide, setLoopClonesPerSide] = useState(0)
   useEffect(() => {
