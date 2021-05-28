@@ -187,13 +187,12 @@ export const Carousel: React.FC<Props> = ({
       enabled={scrollEnabled}
       shouldCancelWhenOutside
       hitSlop={HIT_SLOP}
-      minDist={0}
     >
       <Animated.View style={[{
         width: sliderWidth,
         height: sliderHeight,
         overflow: 'hidden',
-      }, horizontal ? {justifyContent: 'center'} : {alignItems: 'center',}]}
+      }, horizontal ? { justifyContent: 'center' } : { alignItems: 'center' }]}
       >
         <Animated.View style={[{
           transform: [horizontal ? { translateX: distanceAnimated } : { translateY: distanceAnimated }],
